@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+
+	<head>
+		<meta charset="utf-8">
+
+		<title>Data Definition Language in Haskell</title>
+
+		<meta name="description" content="A framework for simple cross language data exchange">
+		<meta name="author" content="Csaba Hruska">
+
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+		<meta name="viewport" content="width=device-width initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+
+		<link rel="stylesheet" href="css/reveal.css">
+		<link rel="stylesheet" href="css/theme/black.css" id="theme">
+
+		<!-- Code syntax highlighting -->
+		<link rel="stylesheet" href="lib/css/zenburn.css">
+
+		<!-- Printing and PDF exports -->
+		<script>
+			var link = document.createElement( 'link' );
+			link.rel = 'stylesheet';
+			link.type = 'text/css';
+			link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+			document.getElementsByTagName( 'head' )[0].appendChild( link );
+		</script>
+
+		<!--[if lt IE 9]>
+		<script src="lib/js/html5shiv.js"></script>
+    <![endif]-->
+  </head>
+
+<body>
+  <!-- Wrap the entire slide show in a div using the "reveal" class. -->
+  <div class="reveal">
+    <!-- Wrap all slides in a single "slides" class -->
+    <div class="slides">
+      <!-- Each section element contains an individual slide -->
+      <section>
+        <h1>Data Definition Language in Haskell</h1>
+        <p>for simple cross language data exchange</p>
+      </section>
+
+      <section>
+        <h1>The Problem</h1>
+        <p>Example: Web application</p>
+        <ul>
+          <li>Haskell server</li>
+          <li>PureScript in the browser (client)</li>
+        </ul>
+        <p>use same data structures for communication</p>
+      </section>
+
+      <section>
+        <h2>Attempt #1</h2>
+        <p>Handwritten code in Haskell</p>
+        <pre><code class="hs" data-trim contenteditable>
+data FrameResult
+  = FrameResult
+  { frRenderTimes :: Vector Float
+  , frImageWidth :: Int
+  , frImageHeight :: Int
+  }
+
+data RenderJobResult
+  = RenderJobResult FrameResult
+  | RenderJobError String
+        </code></pre>
+        <p>let's define our data types</p>
+      </section>
+
+      <section>
+        <h2>Attempt #1</h2>
+        <p>Serialization code in Haskell</p>
+        <pre><code class="hs" data-trim contenteditable>
+instance ToJSON RenderJobResult where
+  toJSON v = case v of
+    RenderJobResult arg0 -> object
+      [ "tag" .= ("RenderJobResult" :: Text)
+      , "arg0" .= arg0 ]
+    RenderJobError arg0 -> object
+      [ "tag" .= ("RenderJobError" :: Text)
+      , "arg0" .= arg0 ]
+
+instance FromJSON RenderJobResult where
+  parseJSON (Object obj) = do
+    tag <- obj .: "tag"
+    case tag :: Text of
+      "RenderJobResult" -> RenderJobResult <$> obj .: "arg0"
+      "RenderJobError" -> RenderJobError <$> obj .: "arg0"
+  parseJSON _ = mzero
+        </code></pre>
+        <p>using Aeson JSON library</p>
+      </section>
+
+      <section>
+        <h2>Attempt #1</h2>
+        <p>PureScript: Data definitions</p>
+        <pre><code class="hs" data-trim contenteditable>
+data FrameResult
+  = FrameResult
+  { frRenderTimes :: Array Float
+  , frImageWidth :: Int
+  , frImageHeight :: Int
+  }
+
+data RenderJobResult
+  = RenderJobResult FrameResult
+  | RenderJobError String
+        </code></pre>
+      </section>
+      <section>
+        <h2>Attempt #1</h2>
+        <p>PureScript: Serialization</p>
+        <pre><code class="hs" data-trim contenteditable>
+instance encodeJsonRenderJobResult :: EncodeJson RenderJobResult where
+  encodeJson v = case v of
+    RenderJobResult arg0 -> "tag" := "RenderJobResult" ~>
+                            "arg0" := arg0 ~> jsonEmptyObject
+    RenderJobError arg0 -> "tag" := "RenderJobError" ~>
+                           "arg0" := arg0 ~> jsonEmptyObject
+
+instance decodeJsonRenderJobResult :: DecodeJson RenderJobResult where
+  decodeJson json = do
+    obj <- decodeJson json
+    tag <- obj .? "tag"
+    case tag of
+      "RenderJobResult" -> RenderJobResult <$> obj .? "arg0"
+      "RenderJobError" -> RenderJobError <$> obj .? "arg0"
+        </code></pre>
+        <p>using Argonaut JSON library</p>
+      </section>
+
+      <section>
+        <h1>Generate Code</h1>
+        <p>Thrift, ProtoBuf, MessagePack, etc</p>
+        <p class="fragment" style="color:red;">Problem: no support for Algebraic Data Types!</p>
+        <p class="fragment">Let's create an EDSL!</p>
+      </section>
+      <section>
+        <h2>Data Definition EDSL</h2>
+        <pre><code class="hs" data-trim contenteditable>
+definitions = do
+  -- test result
+  data_ "FrameResult" $ do
+    constR_ "FrameResult"
+      [ "frRenderTimes" #:: Array Float
+      , "frImageWidth"  #:: Int
+      , "frImageHeight" #:: Int
+      ]
+
+  data_ "RenderJobResult" $ do
+    const_ "RenderJobResult"  ["FrameResult"]
+    const_ "RenderJobError"   [String]
+        </code></pre>
+        <p>do notation is perfect for this!</p>
+      </section>
+
+      <section>
+        <h2>Builtin types</h2>
+        <p>String, Bool, Int, Float, Map, Array, Maybe, etc.</p>
+        <pre><code class="hs" data-trim contenteditable>
+data Type
+  = Int
+  | Float
+  | Bool
+  | String
+  -- higher order types
+  | Array { type_ :: Type }
+  | List { type_ :: Type }
+  | Maybe { type_ :: Type }
+  | Map { key_ :: Type, value_ :: Type }
+  -- user defined
+  | Data { name_ :: String }
+        </code></pre>
+      </section>
+
+      <section>
+        <h2>Definitions</h2>
+        <pre><code class="hs" data-trim contenteditable>
+data DataDef = DataDef
+  { dataName      :: String
+  , constructors  :: [ConstructorDef]
+  , instances     :: [Instance]
+  }
+data ConstructorDef = ConstructorDef
+  { name          :: String
+  , fields        :: [Field]
+  }
+data Field = Field
+  { fieldName :: String
+  , fieldType :: Type
+  }
+data Instance = Show | Eq | Ord
+        </code></pre>
+      </section>
+
+      <section>
+        <h2>Operators</h2>
+        <pre><code class="hs" data-trim contenteditable>
+type DDef = Writer ([DataDef],[String])
+type CDef = Writer ([ConstructorDef],[Instance])
+
+data_ :: String -> CDef () -> DDef ()
+data_ n l = tell ([let (c,i) =
+  execWriter l in DataDef n c i],mempty)
+const_ :: String -> [Type] -> CDef ()
+const_ n t = tell ([ConstructorDef n
+                      [Field a b | Field a b <- map toField t]]
+                  ,mempty)
+constR_ :: String -> [Field] -> CDef ()
+constR_ n t = tell ([ConstructorDef n
+                      [Field a b | Field a b <- map toField t]]
+                   ,mempty)
+(#::) :: String -> Type -> Field
+a #:: b = Field a b
+        </code></pre>
+      </section>
+
+      <section>
+        <h2>Code generator</h2>
+        <p>EDE is a templating language written in Haskell</p>
+        <ul>
+        <li>Write templates for languages</li>
+        <li>Dump DataDef list into an EDE template</li>
+        <li>Easy to pass data: just derive Generic for DataDef</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Code generator</h2>
+        <p>Haskell data definitions</p>
+        <pre><code class="hs" data-trim contenteditable>
+{% for t in dataAndType %}
+{% case t.value | constType %}
+{% when "DataDef" %}
+data {{ t.value.dataName }}{% for c in t.value.constructors %}
+{% if c.value.fields | hasFieldNames %}
+  {% if c.first %}={% else %}|{% endif %} {{ c.value.name }}
+{% for f in c.value.fields %}{% if f.first %}  { {%else%}  , {%endif%}{{ f.value.fieldName }} :: {{ f.value.fieldType | hsType }}
+{% endfor %}
+  }
+{% else %}
+  {% if c.first %}={% else %}|{% endif %} {{ c.value.name }}{% for f in c.value.fields %} {{ f.value.fieldType | hsType | parens }}{% endfor %}{% endif %}{% endfor %}
+  deriving (Show, Eq, Ord)
+{% when "TypeAlias" %}
+type {{ t.value.aliasName }} = {{ t.value.aliasType | hsType }}
+{% endcase %}
+
+{% endfor %}
+        </code></pre>
+        <p class="fragment">Template Haskell! :)</p>
+      </section>
+
+      <section>
+        <h2>Code generator</h2>
+        <p>Aeson: ToJSON & FromJSON instances</p>
+        <pre><code class="hs" data-trim contenteditable>
+{% for t in definitions %}
+instance ToJSON {{ t.value.dataName }} where
+  toJSON v = case v of{% for c in t.value.constructors %}{% if c.value.fields | hasFieldNames %}
+    {{ c.value.name }}{..} -> object
+      [ "tag" .= ("{{ c.value.name }}" :: Text){% for f in c.value.fields %}
+      , "{{ f.value.fieldName }}" .= {{ f.value.fieldName }}{% endfor %}
+      ]{% else %}
+    {{ c.value.name }}{% for f in c.value.fields %} arg{{ f.index0 }}{% endfor %} -> object [ "tag" .= ("{{ c.value.name }}" :: Text){% for f in c.value.fields %}, "arg{{ f.index0 }}" .= arg{{ f.index0 }}{% endfor %}]{% endif %}{% endfor %}
+instance FromJSON {{ t.value.dataName }} where
+  parseJSON (Object obj) = do
+    tag <- obj .: "tag"
+    case tag :: Text of{% for c in t.value.constructors %}{% if c.value.fields | hasFieldNames %}
+      "{{ c.value.name }}" -> do{% for f in c.value.fields %}
+        {{ f.value.fieldName }} <- obj .: "{{ f.value.fieldName }}"{% endfor %}
+        pure $ {{ c.value.name }}{% for f in c.value.fields %}
+          {% if f.first %}{ {% else %}, {%endif%}{{ f.value.fieldName }} = {{ f.value.fieldName }}{% endfor %}
+          } {% else %}
+      "{{ c.value.name }}" -> {% for f in c.value.fields %}{% if f.first %}{{ c.value.name }} <$>{% else %} <*>{% endif %} obj .: "arg{{ f.index0 }}"{%else%}pure {{ c.value.name }}{% endfor %}{% endif %}{% endfor %}
+  parseJSON _ = mzero
+{% endfor %}
+        </code></pre>
+      </section>
+
+      <section>
+        <h2>Code generator: Java</h2>
+        <p>Algebraic Data Type as Classes</p>
+        <pre><code class="java" data-trim contenteditable>
+public class RenderJobResult {
+  public enum Tag { 
+    RenderJobResult,
+    RenderJobError
+  }
+  public Tag tag;
+
+  public class RenderJobResult_ extends RenderJobResult { 
+    public FrameResult _0;
+    public RenderJobResult_() { tag = RenderJobResult.Tag.RenderJobResult; }
+  }
+  public class RenderJobError_ extends RenderJobResult { 
+    public String _0;
+    public RenderJobError_() { tag = RenderJobResult.Tag.RenderJobError; }
+  }
+}
+        </code></pre>
+      </section>
+
+      <section>
+        <h2>Code generator: Java JSON</h2>
+        <p>No type class support: no branching on types</p>
+        <pre><code class="java" data-trim contenteditable>
+public class JSON {
+  // JSON deserializer
+  public enum Type { 
+    Int,
+    Float,
+    String,
+    Array_Float,
+    FrameResult,
+    RenderJobResult
+  }
+        </code></pre>
+        <p>Do it explicitly!</p>
+      </section>
+
+      <section>
+        <h2>Code generator: Java JSON</h2>
+        <pre><code class="java" data-trim contenteditable>
+  public static Object fromJSON(Type type, Object rawObj) throws JSONException, Exception {
+    switch (type) {
+      case Float: return ((Number)rawObj).floatValue();
+      case Array_Float: {
+        JSONArray obj = (JSONArray)rawObj;
+        ArrayList<Float> v = new ArrayList<Float> ();
+        for (int i = 0; i < obj.length(); i++) {
+          v.add((Float)fromJSON (Type.Float, obj.get(i)));
+        }
+        return v;
+      }
+      case FrameResult: {
+        JSONObject obj = (JSONObject)rawObj;
+        String tag = obj.getString("tag");
+        switch (tag) {
+          case "FrameResult": {
+            FrameResult.FrameResult_ tv = new FrameResult().new FrameResult_();
+            tv.frRenderTimes = (ArrayList<Float>)fromJSON(Type.Array_Float,obj.get("frRenderTimes"));
+            tv.frImageWidth = (Integer)fromJSON(Type.Int,obj.get("frImageWidth"));
+            tv.frImageHeight = (Integer)fromJSON(Type.Int,obj.get("frImageHeight"));
+            return tv;
+          }
+          default: throw new Exception("unknown constructor: " + tag);
+        }
+      }
+        </code></pre>
+        <p>Generated from template</p>
+      </section>
+
+
+      <section>
+        <h1>That's all</h1>
+        <p>Check it out on <a href="https://github.com/lambdacube3d/lambdacube-ir/tree/master/ddl" target="_blank">GitHub</a>.</p>
+      </section>
+
+      <section>
+        <h1>Questions?</h1>
+      </section>
+
+    </div>
+  </div>
+
+    <script src="lib/js/head.min.js"></script>
+    <script src="js/reveal.js"></script>
+
+    <script>
+
+      // Full list of configuration options available at:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        controls: false,
+        progress: true,
+        history: true,
+        center: true,
+
+        transition: 'slide', // none/fade/slide/convex/concave/zoom
+
+        // Optional reveal.js plugins
+        dependencies: [
+          { src: 'lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+          { src: 'plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+          { src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+          { src: 'plugin/zoom-js/zoom.js', async: true },
+          { src: 'plugin/notes/notes.js', async: true }
+        ]
+      });
+
+    </script>
+</body>
+</html>
