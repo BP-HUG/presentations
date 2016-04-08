@@ -18,7 +18,9 @@ I present a pattern match compilation algorithm which does exhaustiveness and re
 
 Exchanging data between programs running on different platforms is an everyday problem. Thrift and Protocol Buffers perfectly solve this problem for object oriented languages. However they do not support Algebraic Data Types. Fortunately, with some work, we can write our own Data Definition Language as a Haskell Embedded Domain Specific Language that will support cross language data serialization between several languages (Haskell, PureScript, C#, C++, Java, etc.)
 
-[slides](https://github.com/BP-HUG/presentations/tree/master/2016_april/data-definition-haskell-edsl)
+[slides](http://htmlpreview.github.io/?https://github.com/BP-HUG/presentations/blob/master/2016_april/data-definition-haskell-edsl/slides.html/)
+
+[pdf](https://github.com/BP-HUG/presentations/blob/master/2016_april/data-definition-haskell-edsl/Data%20Definition%20Language%20in%20Haskell.pdf)
 
 [source code](https://github.com/lambdacube3d/lambdacube-ir/tree/v0.3/ddl)
 
