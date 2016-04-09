@@ -2,7 +2,7 @@
 This is the repo for all the presentations held at the Budapest Haskell User Group meetups.
 For more info visit the [group's site.][meetup]
 
-[![Join the chat at https://gitter.im/fossasia/open-event-webapp](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/fossasia/open-event-webapp?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Join the chat at https://gitter.im/BP-HUG](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/BP-HUG)
 
 ## Past events
 ### :cherry_blossom: Let a thousand lambdas bloom (2016-04-07)
