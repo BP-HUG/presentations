@@ -1,0 +1,388 @@
+% Pattern match compilation
+
+# Main task
+
+Transform pattern matching and guards to simple case expressions.
+
+Example code:
+
+~~~~~ {.haskell}
+take n (x: xs) | n > 0 = x: take (n-1) xs
+take _ _ = []
+~~~~~
+
+After transformation:
+
+~~~~~ {.haskell}
+take n vs = case vs of
+    []    -> []
+    x: xs -> case n > 0 of
+        False -> []
+        True  -> x: take (n-1) xs
+~~~~~
+
+Simple case expression:
+
+-   each pattern has the form C v1 ... vn
+-   all possible constructors appear exactly once, in definition order
+
+
+# Other tasks
+
+-   exhaustiveness check
+-   reachability check
+-   [pattern guards](https://wiki.haskell.org/Pattern_guard) desugaring
+-   [view patterns](https://ocharles.org.uk/blog/posts/2014-12-02-view-patterns.html) desugaring
+
+Exhaustiveness example:
+
+~~~~~ {.haskell}
+head (x: xs) = x    -- [] case is missing
+~~~~~
+
+Reachability example #1:
+
+~~~~~ {.haskell}
+head' a = error "no head"
+head' (x: xs) = x   -- alternative is not reachable
+~~~~~
+
+Reachability example #2:
+
+~~~~~ {.haskell}
+f _    False = 1
+f True False = 2    -- 2 is not reachable, but the alternative is not removable!
+f _    _     = 3
+~~~~~
+
+Pattern guard example:
+
+~~~~~ {.haskell}
+lookup :: FiniteMap -> Int -> Maybe Int
+ 
+addLookup env var1 var2
+   | Just val1 <- lookup env var1
+   , Just val2 <- lookup env var2
+   = val1 + val2
+...
+~~~~~
+
+Transformed into:
+
+~~~~~ {.haskell}
+addLookup env var1 var2 = case lookup env var1 of
+    Nothing -> ...
+    Just val1 -> case lookup env var2 of
+        Nothing -> ...
+        Just val2 -> val1 + val2
+~~~~~
+
+Viewpatterns example:
+
+~~~~~ {.haskell}
+f :: Complex -> Double
+f (polar -> (arg, d)) | d > 1 = arg
+f _ = 0
+~~~~~
+
+Transformed into:
+
+~~~~~ {.haskell}
+f z = case polar z of
+    (arg, d) -> case d > 1 of
+        False -> 0
+        True  -> arg
+~~~~~
+
+
+# Algorithm overview
+
+1.  Desugar language constructs to *pattern guard trees*
+2.  Normalize pattern guard trees
+3.  Compile pattern guard trees to case expressions
+
+# Pattern guard trees
+
+An intermediate data structure for pattern guard compilation:
+
+----------- -- ---------------------------------------------------------- -----------------------
+*guardtree* := *expression*                                               **success**
+            |  `MatchFailure`                                             **failure**
+            |  *guardtree* `|` *guardtree*                                **alternatives**
+            |  *pattern* `<-` *expression* `,` *guardtree*                **pattern guard**
+            |  `let` *bindings* `in` *guardtree*                          **let binding**
+----------- -- ---------------------------------------------------------- -----------------------
+
+Guard trees are generalization of pattern guards:
+
+-   guard trees are expressions
+-   alternatives can appear not just on the top level
+-   let bindings can appear not just on the top level
+
+
+# Desugaring to pattern guard trees
+
+Example:
+
+~~~~~ {.haskell}
+zip []     _      = []
+zip x      []     = []
+zip (a:as) (b:bs) = (a,b) : zip as bs
+~~~~~
+
+Transformed code:
+
+~~~~~ {.haskell}
+zip v0 v1
+    = ([]   <- v0, _    <- v1,  [])
+    | (x    <- v0, []   <- v1,  [])
+    | (a:as <- v0, b:bs <- v1,  (a,b) : zip as bs)
+~~~~~
+
+
+# Basic properties of pattern guard trees
+
+------------------------------------- -------------------------- ------------------------------- 
+t `|` (t' `|` t'')                    = (t `|` t') `|` t''       (`|`) is associative            
+`MatchFailure` `|` t                  = t                        `MatchFailure` is left unit     
+t `|` `MatchFailure`                  = t                        `MatchFailure` is right unit    
+t `|` t                               = t                        (`|`) is idempotent
+e `|` t                               = e                        success ignores alternative    
+C1 p1 ... pn `<-` C2 e1 ... em`,` t   = `MatchFailure`           constructor match failure       
+------------------------------------- -------------------------- ------------------------------- 
+
+
+# Normalization of pattern guard trees
+
+Simple constructor patterns:
+
+------------- -- ---------------------------------------------------------- -----------------------
+*conpattern*  := *conname* (*variable*)*
+------------- -- ---------------------------------------------------------- -----------------------
+
+The following equations turn all patterns into simple constructor patterns:
+
+---------------------------- -------------------------------------------------------------- ------------------- 
+`_` `<-` e`,`  t             =  t                                                           wildcard elim       
+v `<-` e`,`  t               =  `let` v = e `in` t                                          variable elim       
+v`@`p `<-` e`,`  t           =  `let` v = e `in` p `<-` v`,` t                              at-pattern elim     
+C p1 ... pn `<-` e`,`  t     =  C w1 ... wn `<-` e`,` p1 `<-` w1`,` ...`,` pn `<-` wn`,` t  nested pattern elim 
+(f `->` p) `<-` e`,`  t      =  p `<-` f e`,` t                                             view pattern elim   
+---------------------------- -------------------------------------------------------------- ------------------- 
+
+### Compilation of pattern guard trees
+
+Compilation is driven by the following equations:
+
+1.  C ... `<-` e`,` t | t'  
+    =  `seq` e (C ... `<-` e`,` t | t')
+
+1.  `seq` e t  
+    =  `case` e `of` p1 `->` t; ...; pn `->` t  
+    if p1, ..., pn is complete
+
+1.  `case` e `of` ...; C e1 ... en `->` ... (C v1 ... vn `<-` e`,` t | t') ...; ...  
+    = `case` e `of` ...; C e1 ... en `->` ... (`let` v1 = e1; ...; vn = en `in` t) ...; ...
+
+1.  `case` e `of` ...; C1 e1 ... en `->` ... (C2 v1 ... vn `<-` e`,` t | t') ...; ...  
+    =  `case` e `of` ...; C1 e1 ... en `->` ... t' ...; ...
+
+
+
+# Complete example
+
+Source code:
+
+~~~~~ {.haskell}
+zip []     _      = []
+zip x      []     = []
+zip (a:as) (b:bs) = (a,b) : zip as bs
+~~~~~
+
+Transformed to pattern guard trees:
+
+~~~~~ {.haskell}
+zip v0 v1
+    = ([] <- v0, _ <- v1,  [])
+    | (x <- v0, [] <- v1,  [])
+    | (a:as <- v0, b:bs <- v1,  (a,b) : zip as bs)
+~~~~~
+
+Simplified pattern guard trees:
+
+~~~~~ {.haskell}
+zip v0 v1
+    = ([] <- v0,  [])
+    | (let x = v0 in [] <- v1,  [])
+    | (a:as <- v0, b:bs <- v1,  (a,b) : zip as bs)
+~~~~~
+
+Apply (1):
+
+~~~~~ {.haskell}
+zip v0 v1 = v0 `seq`
+      ([] <- v0,  [])
+    | (let x = v0 in [] <- v1,  [])
+    | (a:as <- v0, b:bs <- v1,  (a,b) : zip as bs)
+~~~~~
+
+Apply (2) with patterns `[]` and `x:xs`:
+
+~~~~~ {.haskell}
+zip v0 v1 = case v0 of
+    [] ->
+          ([] <- v0,  [])
+        | (let x = v0 in [] <- v1,  [])
+        | (a:as <- v0, b:bs <- v1,  (a,b) : zip as bs)
+    x: xs ->
+          ([] <- v0,  [])
+        | (let x = v0 in [] <- v1,  [])
+        | (a:as <- v0, b:bs <- v1,  (a,b) : zip as bs)
+~~~~~
+
+Apply (3); empty let is eliminated:
+
+~~~~~ {.haskell}
+zip v0 v1 = case v0 of
+    [] -> []
+    x: xs ->
+          ([] <- v0,  [])
+        | (let x = v0 in [] <- v1,  [])
+        | (a:as <- v0, b:bs <- v1,  (a,b) : zip as bs)
+~~~~~
+
+Apply (4):
+
+~~~~~ {.haskell}
+zip v0 v1 = case v0 of
+    [] -> []
+    x: xs ->
+          (let x = v0 in [] <- v1,  [])
+        | (a:as <- v0, b:bs <- v1,  (a,b) : zip as bs)
+~~~~~
+
+Let floating:
+
+~~~~~ {.haskell}
+zip v0 v1 = case v0 of
+    [] -> []
+    x: xs -> let x = v0 in
+          ([] <- v1,  [])
+        | (a:as <- v0, b:bs <- v1,  (a,b) : zip as bs)
+~~~~~
+
+Apply (1):
+
+~~~~~ {.haskell}
+zip v0 v1 = case v0 of
+    [] -> []
+    x: xs -> let x = v0 in v1 `seq`
+          ([] <- v1,  [])
+        | (a:as <- v0, b:bs <- v1,  (a,b) : zip as bs)
+~~~~~
+
+Apply (2) with patterns `[]` and `y: ys`:
+
+~~~~~ {.haskell}
+zip v0 v1 = case v0 of
+    [] -> []
+    x: xs -> let x = v0 in case v1 of
+        [] ->
+              ([] <- v1,  [])
+            | (a:as <- v0, b:bs <- v1,  (a,b) : zip as bs)
+        y: ys ->
+              ([] <- v1,  [])
+            | (a:as <- v0, b:bs <- v1,  (a,b) : zip as bs)
+~~~~~
+
+Apply (3):
+
+~~~~~ {.haskell}
+zip v0 v1 = case v0 of
+    [] -> []
+    x: xs -> let x = v0 in case v1 of
+        [] -> []
+        y: ys ->
+              ([] <- v1,  [])
+            | (a:as <- v0, b:bs <- v1,  (a,b) : zip as bs)
+~~~~~
+
+Apply (4):
+
+~~~~~ {.haskell}
+zip v0 v1 = case v0 of
+    [] -> []
+    x: xs -> let x = v0 in case v1 of
+        [] -> []
+        y: ys ->
+              a:as <- v0, b:bs <- v1,  (a,b) : zip as bs
+~~~~~
+
+Apply (3):
+
+~~~~~ {.haskell}
+zip v0 v1 = case v0 of
+    [] -> []
+    x: xs -> let x = v0 in case v1 of
+        [] -> []
+        y: ys -> let a = x; as = xs in b:bs <- v1,  (a,b) : zip as bs
+~~~~~
+
+Apply (3):
+
+~~~~~ {.haskell}
+zip v0 v1 = case v0 of
+    [] -> []
+    x: xs -> let x = v0 in case v1 of
+        [] -> []
+        y: ys -> let a = x; as = xs in let b = y; bs = ys in  (a,b) : zip as bs
+~~~~~
+
+Simplification:
+
+~~~~~ {.haskell}
+zip v0 v1 = case v0 of
+    [] -> []
+    x: xs -> case v1 of
+        [] -> []
+        y: ys -> (x, y) : zip xs ys
+~~~~~
+
+
+# Checks
+
+Exhaustiveness check is just finding `MatchFailure` values in the result.
+
+Reachability check is just finding parts of source code not present in result.
+
+
+# Extensions
+
+Step (2) is very general:
+
+-   For pattern matching just on a single constructor C, the patterns {C v1 ... vn, _} can be used.  
+    This can prevent quadratic code blowup in case of ADT with many constructors.
+-   Pattern matching on types is possible in a similar way.
+-   In case of GADTs, for better warnings, type information can be taken into account to restrict the set of matching constructor patterns,
+    similar to [GADTs Meet Their Match](https://people.cs.kuleuven.be/~george.karachalias/papers/p424-karachalias.pdf), implemented in GHC 8.
+
+# Discussion
+
+-   Extension with dependent pattern matching seems possible but has to be explored.
+-   The algorithm produce fast code, but in some cases the size of produced code may blow up.  
+    Compilation driven by more than 4 equations might prevent this.
+-   [A prototype was implemented.](https://github.com/lambdacube3d/lambdacube-compiler/blob/master/prototypes/PatCompile.hs)
+
+# Conclusion
+
+-   Using pattern guard trees as an intermediate data structure keeps the algorithm simple.
+-   Integrated exhaustiveness and reachability checks are quite cheap.
+-   Algorithms are driven by general equations which helps reasoning about them a lot.
+
+# Related work
+
+Have not seen this approach before; help to compare it with others.
+
+
+
+
