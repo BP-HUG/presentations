@@ -8,7 +8,7 @@ For more info visit the [group's site.][meetup]
 * [Repo for the presentations][2016-04-07]
 * [Meetup site][thousand]
 
-## For future event
+## For future events
 If you want to hold a presentation create an issue here, or contact us on the [meetup's site][meetup].
 For help check out our wiki for a [checklist][wiki] for helping getting you ready.
 
