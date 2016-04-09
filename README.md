@@ -8,6 +8,11 @@ For more info visit the [group's site.][meetup]
 * [Repo for the presentations][2016-04-07]
 * [Meetup site][thousand]
 
+## For future event
+If you want to hold a presentation create an issue here, or contact us on the [meetup's site][meetup].
+For help check out our wiki for a [checklist][wiki] for helping getting you ready.
+
 [meetup]: http://www.meetup.com/Bp-HUG
 [thousand]: http://www.meetup.com/Bp-HUG/events/230094042/
 [2016-04-07]: https://github.com/BP-HUG/presentations/blob/master/2016_april/2016-04-07_Let_a_thousand_lambdas_bloom.md
+[wiki]: https://github.com/BP-HUG/presentations/wiki
