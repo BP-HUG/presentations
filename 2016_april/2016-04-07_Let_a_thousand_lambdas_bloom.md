@@ -51,7 +51,8 @@ More info:
 _Abstract:_
 > Servant is becoming very popular for type-safe web routing in Haskell. However, we found that for our use case, it is somewhat overcomplicated and uncomfortable. We developed a similar, but simpler library, Solga, and found that it presents a number of advantages.
 
-This was also a demo. The Solga library will be open sourced in the near future. We will post a link when it is.
+This was also a demo. The Solga library is now open source and you can find it here:
+* [The code for the Solga library][solga]
 
 [meetup]: http://www.meetup.com/Bp-HUG/events/230094042/
 [konig_terem]: https://immanuel60.hu/wp-content/uploads/2011/09/elte_ik_deli_epulet_alaprajz.jpg
@@ -63,3 +64,4 @@ This was also a demo. The Solga library will be open sourced in the near future.
 [edsl_html]: https://rawgit.com/BP-HUG/presentations/master/2016_april/data-definition-haskell-edsl/slides.html
 [edsl_pdf]: https://github.com/BP-HUG/presentations/blob/master/2016_april/data-definition-haskell-edsl/Data%20Definition%20Language%20in%20Haskell.pdf
 [edsl_source]: https://github.com/lambdacube3d/lambdacube-ir/tree/v0.3/ddl
+[solga]: https://github.com/chpatrick/solga
