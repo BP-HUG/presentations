@@ -100,7 +100,7 @@
         <h2>Using Binary</h2>
         <p>Efficient, pure binary (de)serialisation</p>
         <p>using <a href="http://hackage.haskell.org/package/binary-0.8.3.0/docs/Data-Binary-Get.html" target="_blank">Data.Binary.Get</a></p>
-        <p>BSP loader <a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/master/GameEngine/BSP.hs" target="_blank">source</a></p>
+        <p>BSP loader <a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/hug_may2016/GameEngine/BSP.hs" target="_blank">source</a></p>
       </section>
 
       <section>
@@ -146,7 +146,7 @@ value :: Parser (EntityData -> EntityData)
 value = stringLiteral >>= \case
   "classname"   -> (\v e -> e {classname = v}) <$> stringLiteral
         </code></pre>
-        <p>Entity parser <a href="https://github.com/csabahruska/q3-prototype/blob/master/Entity.hs" target="_blank">source</a></p>
+        <p>Entity parser <a href="https://github.com/csabahruska/q3-prototype/blob/hug_may2016/Entity.hs" target="_blank">source</a></p>
       </section>
 
       <section>
@@ -154,7 +154,7 @@ value = stringLiteral >>= \case
         <p>Weapons, Ammos, Armors, Health</p>
         <p>item descriptions in code</p>
         <p>C <a href="https://github.com/ioquake/ioq3/blob/master/code/game/bg_misc.c#L44" target="_blank">source</a></p>
-        <p>Haskell <a href="https://github.com/csabahruska/q3-prototype/blob/master/Items.hs" target="_blank">source</a></p>
+        <p>Haskell <a href="https://github.com/csabahruska/q3-prototype/blob/hug_may2016/Items.hs" target="_blank">source</a></p>
       </section>
 
       <section>
@@ -163,7 +163,7 @@ value = stringLiteral >>= \case
           <p>entity models (e.g. weapon)</p>
           <p>player model</p>
         <p>.md3 format <a href="https://en.wikipedia.org/wiki/MD3_(file_format)" target="_blank">description</a></p>
-        <p>MD3 loader <a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/master/GameEngine/MD3.hs" target="_blank">source</a></p>
+        <p>MD3 loader <a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/hug_may2016/GameEngine/MD3.hs" target="_blank">source</a></p>
       </section>
 
       <section>
@@ -197,8 +197,8 @@ textures/skies/xtoxicsky_dm9
       <section>
         <h2>Material Parser</h2>
         <p>no rendering, just store material description</p>
-        <p>data structure for materials: <a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/master/GameEngine/Material.hs" target="_blank">source</a></p>
-        <p>parser <a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/master/GameEngine/ShaderParser.hs" target="_blank">source</a> using Attoparsec</p>
+        <p>data structure for materials: <a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/hug_may2016/GameEngine/Material.hs" target="_blank">source</a></p>
+        <p>parser <a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/hug_may2016/GameEngine/ShaderParser.hs" target="_blank">source</a> using Attoparsec</p>
       </section>
 
       <section>
@@ -208,7 +208,7 @@ textures/skies/xtoxicsky_dm9
 
       <section>
         <h1>LambdaCube 3D</h1>
-        <p>first <a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/master/lc/Graphics.lc" target="_blank">create a rendering function</a> for given materials</p>
+        <p>first <a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/hug_may2016/lc/Graphics.lc" target="_blank">create a rendering function</a> for given materials</p>
         <pre><code class="hs" data-trim contenteditable>
 q3GFX :: [(String,CommonAttrs)] -> FB
         </code></pre>
@@ -228,7 +228,7 @@ q3GFX :: [(String,CommonAttrs)] -> FB
           <li>cull against brush planes</li>
         </ol>
         <p>based on a blog post (<a href="https://github.com/JodiTheTigger/MessyBsp/blob/master/docs/section6.txt" target="_blank">C source</a>)</p>
-        <p>rewritten in Haskell (<a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/master/GameEngine/Collision.hs" target="_blank">source</a>)</p>
+        <p>rewritten in Haskell (<a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/hug_may2016/GameEngine/Collision.hs" target="_blank">source</a>)</p>
       </section>
 
       <section>
