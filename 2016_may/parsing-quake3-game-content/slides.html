@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+
+	<head>
+		<meta charset="utf-8">
+
+		<title>Parisng Quake 3 game content in Haskell</title>
+
+		<meta name="description" content="Parsing id Tech 3 data formats in Haskell">
+		<meta name="author" content="Csaba Hruska">
+
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+		<meta name="viewport" content="width=device-width initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+
+		<link rel="stylesheet" href="css/reveal.css">
+		<link rel="stylesheet" href="css/theme/black.css" id="theme">
+
+		<!-- Code syntax highlighting -->
+		<link rel="stylesheet" href="lib/css/zenburn.css">
+
+		<!-- Printing and PDF exports -->
+		<script>
+			var link = document.createElement( 'link' );
+			link.rel = 'stylesheet';
+			link.type = 'text/css';
+			link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+			document.getElementsByTagName( 'head' )[0].appendChild( link );
+		</script>
+
+		<!--[if lt IE 9]>
+		<script src="lib/js/html5shiv.js"></script>
+    <![endif]-->
+  </head>
+
+<body>
+  <!-- Wrap the entire slide show in a div using the "reveal" class. -->
+  <div class="reveal">
+    <!-- Wrap all slides in a single "slides" class -->
+    <div class="slides">
+      <!-- Each section element contains an individual slide -->
+      <section>
+        <h1>Parsing Quake 3 game content</h1>
+      </section>
+
+      <section>
+        <h1>id Tech 3</h1>
+        <p>alias Quake 3 engine</p>
+        <ul>
+          <li>released in 1999</li>
+          <li>open source since 2005</li>
+          <li>written in C language</li>
+        </ul>
+        <p>fixed function OpenGL era: Voodoo2, Geforce2</p>
+      </section>
+
+      <section>
+        <h2>Game Engine Design</h2>
+        <p><a href="http://fd.fabiensanglard.net/quake3/q3_workspace_architecture2.png" target="_blank">high level diagram</a></p>
+        <p>detailed <a href="http://fabiensanglard.net/quake3/" target="_blank">documentation</a></p>
+        <ul>
+          <li>virtual machine with JIT support</li>
+          <li>native: client, server, renderer</li>
+          <li>VM: server game logic, client UI</li>
+        </ul>
+      </section>
+
+      <section>
+        <h1>ioQuake 3</h1>
+        <p>improved and refactored version of Quake 3</p>
+        <p>souce code is on <a href="https://github.com/ioquake/ioq3" target="_blank">GitHub</a></p>
+      </section>
+
+      <section>
+        <h1>Game Content</h1>
+        <p>comes from PAK0.pk3 (zip file)</p>
+        <ul>
+          <li>game levels (.bsp)</li>
+          <li>3D models (.md3)</li>
+          <li>textures (.tga, .jpg)</li>
+          <li>visual materials (.shader)</li>
+        </ul>
+      </section>
+
+      <section>
+        <h1>BSP map</h1>
+        <p>game level data (e.g. q3dm6.bsp)</p>
+        <ul>
+          <li>graphics geometry</li>
+          <li>lightmaps</li>
+          <li>references to materials</li>
+          <li>collision geometry</li>
+          <li>culling data (e.g. Binary Space Partition tree)</li>
+        </ul>
+        <p>.bsp format <a href="http://www.mralligator.com/q3/" target="_blank">description</a></p>
+      </section>
+
+      <section>
+        <h2>Using Binary</h2>
+        <p>Efficient, pure binary (de)serialisation</p>
+        <p>using <a href="http://hackage.haskell.org/package/binary-0.8.3.0/docs/Data-Binary-Get.html" target="_blank">Data.Binary.Get</a></p>
+        <p>BSP loader <a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/master/GameEngine/BSP.hs" target="_blank">source</a></p>
+      </section>
+
+      <section>
+        <h1>Game Entities</h1>
+        <p>stored in BSP file as a string</p>
+        <pre><code class="js" data-trim contenteditable>
+{
+"origin" "192 -320 16"
+"notfree" "1"
+"classname" "weapon_shotgun"
+}
+{
+"model" "*1"
+"classname" "trigger_push"
+"target" "t3"
+}
+{
+"classname" "info_notnull"
+"targetname" "t3"
+"origin" "-1472 384 668"
+}
+        </code></pre>
+        <p>weapons, armors, triggers (e.g. jump pad, teleport, door)</p>
+      </section>
+
+      <section>
+        <h2>Parser Combinators</h2>
+        <p>Parsec/Megaparsec/Attoparsec</p>
+        <p>using <a href="https://hackage.haskell.org/package/megaparsec" target="_blank">megaparsec</a></p>
+        <pre><code class="hs" data-trim contenteditable>
+parseEntities fname src = case parse entities fname src of
+  Left err  -> Left (parseErrorPretty err)
+  Right e   -> Right e
+
+entities :: Parser [EntityData]
+entities = sc *> many entity <* eof
+
+entity :: Parser EntityData
+entity = foldr ($) defaultEntityData <$>
+                    between (symbol "{") (symbol "}") (some value)
+
+value :: Parser (EntityData -> EntityData)
+value = stringLiteral >>= \case
+  "classname"   -> (\v e -> e {classname = v}) <$> stringLiteral
+        </code></pre>
+        <p>Entity parser <a href="https://github.com/csabahruska/q3-prototype/blob/master/Entity.hs" target="_blank">source</a></p>
+      </section>
+
+      <section>
+        <h2>Builtin Item Entities</h2>
+        <p>Weapons, Ammos, Armors, Health</p>
+        <p>item descriptions in code</p>
+        <p>C <a href="https://github.com/ioquake/ioq3/blob/master/code/game/bg_misc.c#L44" target="_blank">source</a></p>
+        <p>Haskell <a href="https://github.com/csabahruska/q3-prototype/blob/master/Items.hs" target="_blank">source</a></p>
+      </section>
+
+      <section>
+        <h1>MD3 model</h1>
+        <p>binary format for 3D models with animation</p>
+          <p>entity models (e.g. weapon)</p>
+          <p>player model</p>
+        <p>.md3 format <a href="https://en.wikipedia.org/wiki/MD3_(file_format)" target="_blank">description</a></p>
+        <p>MD3 loader <a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/master/GameEngine/MD3.hs" target="_blank">source</a></p>
+      </section>
+
+      <section>
+        <h1>Material</h1>
+        <p>.shader files - declarative language to describe look, textures, colors, animations, geometry deformations</p>
+      </section>
+
+      <section>
+        <h2>Material format</h2>
+        <p>text based format for graphics artists</p>
+        <p>.shader file - <a href="https://graphics.stanford.edu/courses/cs448-00-spring/q3ashader_manual.pdf" target="_blank">declarative language</a></p>
+        <pre><code class="js" data-trim contenteditable>
+textures/skies/xtoxicsky_dm9
+{
+  skyparms full 512 -
+  {
+    map textures/skies/inteldimclouds.tga
+    tcMod scroll 0.1 0.1
+    tcMod scale 3 2
+  }
+  {
+    map textures/skies/intelredclouds.tga
+    blendFunc add
+    tcMod scroll 0.05 0.05
+    tcMod scale 3 3
+  }
+}
+        </code></pre>
+      </section>
+
+      <section>
+        <h2>Material Parser</h2>
+        <p>no rendering, just store material description</p>
+        <p>data structure for materials: <a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/master/GameEngine/Material.hs" target="_blank">source</a></p>
+        <p>parser <a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/master/GameEngine/ShaderParser.hs" target="_blank">source</a> using Attoparsec</p>
+      </section>
+
+      <section>
+        <h1>Rendering</h1>
+        <p>render the geometry according the materials</p>
+      </section>
+
+      <section>
+        <h1>LambdaCube 3D</h1>
+        <p>first <a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/master/lc/Graphics.lc" target="_blank">create a rendering function</a> for given materials</p>
+        <pre><code class="hs" data-trim contenteditable>
+q3GFX :: [(String,CommonAttrs)] -> FB
+        </code></pre>
+        <p>then use the pure render function</p>
+        <ul>
+          <li>input: geometry, constants (time, camera)</li>
+          <li>output: image</li>
+        </ul>
+      </section>
+
+      <section>
+        <h1>Collision Detection</h1>
+        <p>ray trace against planes</p>
+        <p>collision brush = set of convex hulls defined by planes</p>
+        <ol>
+          <li>find brushes in BSP tree</li>
+          <li>cull against brush planes</li>
+        </ol>
+        <p>based on a blog post (<a href="https://github.com/JodiTheTigger/MessyBsp/blob/master/docs/section6.txt" target="_blank">C source</a>)</p>
+        <p>rewritten in Haskell (<a href="https://github.com/lambdacube3d/lambdacube-quake3/blob/master/GameEngine/Collision.hs" target="_blank">source</a>)</p>
+      </section>
+
+      <section>
+        <h1>Map Viewer</h1>
+        <ul>
+          <li>load .bsp level</li>
+          <li>parse entities</li>
+          <li>load .md3 models (for entities)</li>
+          <li>parse materials</li>
+          <li>generate render function for level materials</li>
+          <li>load material textures</li>
+          <li>pass textures and level geometry to render function</li>
+          <li>main loop: update time and camera; render</li>
+        </ul>
+      </section>
+
+      <section>
+        <h1>Source Code</h1>
+        <p>Check it out on GitHub: <a href="https://github.com/lambdacube3d/lambdacube-quake3" target="_blank">https://github.com/lambdacube3d/lambdacube-quake3</a></p>
+      </section>
+
+      <section>
+        <h1>Questions?</h1>
+      </section>
+
+    </div>
+  </div>
+
+    <script src="lib/js/head.min.js"></script>
+    <script src="js/reveal.js"></script>
+
+    <script>
+
+      // Full list of configuration options available at:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        controls: false,
+        progress: true,
+        history: true,
+        center: true,
+
+        transition: 'slide', // none/fade/slide/convex/concave/zoom
+
+        // Optional reveal.js plugins
+        dependencies: [
+          { src: 'lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+          { src: 'plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+          { src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+          { src: 'plugin/zoom-js/zoom.js', async: true },
+          { src: 'plugin/notes/notes.js', async: true }
+        ]
+      });
+
+    </script>
+</body>
+</html>
