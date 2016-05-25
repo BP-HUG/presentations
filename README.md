@@ -22,6 +22,6 @@ For help check out our wiki for a [checklist][wiki] for helping getting you read
 [meetup]: http://www.meetup.com/Bp-HUG
 [2016-04-07]: https://github.com/BP-HUG/presentations/blob/master/2016_april/2016-04-07_Let_a_thousand_lambdas_bloom.md
 [thousand]: http://www.meetup.com/Bp-HUG/events/230094042/
-[2016-05-23]: presentations/2016_may/parsing-quake3-game-content/2016-05-23_Parsing_Quake3_game_content.md
+[2016-05-23]: https://github.com/BP-HUG/presentations/blob/master/2016_may/2016-05-23_Parsing_Quake3_game_content.md
 [quake3]: http://www.meetup.com/Bp-HUG/events/231077698/
 [wiki]: https://github.com/BP-HUG/presentations/wiki
