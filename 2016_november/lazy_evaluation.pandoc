@@ -1,0 +1,497 @@
+% Lazy evaluation
+% Péter Diviánszky
+
+# Introduction
+
+## Motivations
+
+-   to understand lazy evaluation
+    -   to understand purely functional language implementations  
+        (e.g. STG behind GHC)
+-   to be able to implement lazy evaluation efficiently
+
+## Lazy evaluation
+
+Lazy evaluation is an *evaluation strategy* for $\lambda$-expressions.
+
+\   
+Key feature:
+
+-   no work duplication
+    -   Caveat: work may be duplicated within $\lambda$-abstractions
+
+# Natural semantics of lazy evaluation
+
+## $\lambda$-calculus with mutually recursive let bindings
+
+-------------------------------------- ----- --------------------------------------------- ----------------
+$\E\ni e$                               $=$  $\y{v}$                                       --- variable
+                                        $|$  $e\ e'$                                       --- application
+                                        $|$  $\Lam{v}{e}$                                  --- $\lambda$-abstraction
+                                        $|$  $\Let{\Gamma}{e}$                             --- let expression $\medskip$
+$\mathcal{B}\ni\Gamma,\Delta,\Theta$    $=$  $\y{v_1}=e_1;\dots;\y{v_n}=e_n$               --- bindings
+----------------------
+
+Examples:
+
+-   $\Lam{x}{\y{x}}$
+-   $\Lam{f\,x}{\y{f}\,(\y{f}\,\y{x})}\quad\equiv\quad\Lam{f}{\Lam{x}{\y{f}\,(\y{f}\,\y{x})}}$
+-   $\Lam{f}{\Let{\y{x}=\y{f}\,\y{x}}{\y{x}}}$
+-   $\Let{\y{x}=\y{x}}{\y{x}}$
+-   $\Let{\y{x}=\y{y}; \y{y}=\y{x}}{\y{x}}$
+
+
+## Variable representation
+
+Possibilities:
+
+A)  $\y{v} \in \mathcal{V}$, an infinite set of symbols
+    -   renaming of variables is needed to avoid name conflicts
+B)  each variable is the same and we count shadowings  
+    (called De-Bruijn indices)
+    -   recalculation of shadowings is needed in operations
+
+Variable representation is an orthogonal choice which we postpone.
+
+
+## More extensions to $\lambda$-calculus
+
+-------------------------------------- ----- --------------------------------------------- ----------------
+$\E\ni e$                               $=$  $\dots$                                       
+                                        $|$  $\dots | -1\,|\,0\,|\,1\,|\,2\,|\,\dots$      --- integer literals
+                                        $|$  $e + e'$                                      --- addition
+                                        $|$  $e * e'$                                      --- multiplication
+----------------------
+
+Examples:
+
+-   $1+2*3$
+-   $\Let{\y{x}=1+1}{\y{x}+\y{x}}$
+
+## Evaluation judgement
+
+$$\results{e}{e'}$$
+
+Examples:
+
+-   $\results{1}{1}$
+-   $\results{1+2*3}{7}$
+-   $\results{\Let{\y{x}=1+1}{\y{x}+\y{x}}}{4}$
+-   $\results{\Lam{x}{\y{x}}}{\Lam{x}{\y{x}}}$
+-   $\results{\Lam{x}{1+1}}{\Lam{x}{1+1}}$
+-   $\results{(\Lam{x}{\y{x}})\,(\Lam{y}{\y{y}})}{\Lam{y}{\y{y}}}$
+-   $\results{\Let{\y{x}=1+1}{\y{x}+\y{z}}}{2+\y{z}}$
+-   $\results{\Let{\y{x}=1+1}{\y{z}+\y{x}}}{\Let{\y{x}=1+1}{\y{z}+\y{x}}}$
+
+## Heap
+
+Let us call *heap* the top-level let bindings of expressions:
+$$\Let{\underbrace{\y{x}=1; \y{y}=2}_{\text{heap}}}{\underbrace{\y{x}+\y{y}}_{\text{main expression}}}$$
+
+We ensure that each expression has a heap:
+$$e\quad\leadsto\quad\Let{\y{main}=e}{\y{main}}$$
+or
+$$e\quad\leadsto\quad\Let{\varepsilon}{e}$$
+
+
+## $\text{\sc Lam}$-rule
+
+$\lambda$-abstractions and literals are ready to use, nothing to do with them:
+\begin{mathpar}
+\inferrule*[Right=Lam]{{}}
+{\results{\Let{\Gamma}{n}}{\Let{\Gamma}{n}}}
+\end{mathpar}
+$n$ stands for a $\lambda$-abstraction or a literal.
+
+\   
+Example:
+\begin{mathpar}
+\inferrule*[Right=Lam]{{}}
+{\results{\Let{\varepsilon}{\Lam{y}{\y{y}}}}{\Let{\varepsilon}{\Lam{y}{\y{y}}}}}
+\end{mathpar}
+
+## $\text{\sc Let}$-rule
+
+Let bidings are added to the heap:
+
+\begin{mathpar}
+\inferrule*[Right=Let]{\results{\Let{\Gamma;\Delta}{e}}{\Let{\Theta}{e'}}}
+{\results{\Let{\Gamma}{(\Let{\Delta}{e})}}{\Let{\Theta}{e'}}}
+\end{mathpar}
+
+Example:
+
+\begin{center}
+\begin{adjustbox}{max width=250pt}
+\begin{mathpar}
+\inferrule*[Right=Let]{\inferrule*{\dots}{\results{\Let{\y{x}=1+1;\y{y}=1*1}{\y{x}+\y{y}}}{\Let{\y{x}=2;\y{y}=1}{3}}}}
+{\results{\Let{\y{x}=1+1}{(\Let{\y{y}=1*1}{\y{x}+\y{y}})}}{\Let{\y{x}=2;\y{y}=1}{3}}}
+\end{mathpar}
+\end{adjustbox}
+\end{center}
+
+## $\text{\sc Var}$-rule
+
+Lookup the variable on the heap and evaluate it:
+
+\begin{mathpar}
+\inferrule*[Right=Var]{\results{\Let{\Gamma}{e}}{\Let{\Theta}{n}}}
+{\results{\Let{\Gamma;\y{v}=e}{\y{v}}}{\Let{\Theta;\y{v}=n}{n}}}
+\end{mathpar}
+
+Example:
+
+\begin{mathpar}
+\inferrule*[Right=Var]{\inferrule*{\dots}{\results{\Let{\varepsilon}{1+1}}{\Let{\varepsilon}{2}}}}
+{\results{\Let{\y{x}=1+1}{\y{x}}}{\Let{\y{x}=2}{2}}}
+\end{mathpar}
+
+
+## $\text{\sc App}$-rule
+
+First evaluate the function, then the argument:
+
+\begin{mathpar}
+\inferrule*[Right=App]{\results{\Let{\Gamma}{e}}{\Let{\Delta}{\Lam{v}{e''}}} \\ \results{\Let{\Delta;\y{v} = e'}{e''}}{\Let{\Theta}{e'''}}}
+{\results{\Let{\Gamma}{e\ e'}}{\Let{\Theta}{e'''}}}
+\end{mathpar}
+
+Example:
+
+\begin{center}
+\begin{adjustbox}{max width=250pt}
+\begin{mathpar}
+\inferrule*[Right=App]{\inferrule*{\dots}{\results{\Let{\y{f}=\Lam{y}{\y{y}}}{\y{f}}}{\Let{\y{f}=\Lam{y}{\y{y}}}{\Lam{y}{\y{y}}}}} \\ \inferrule*{\dots}{\results{\Let{\y{f}=\Lam{y}{\y{y}};\y{y} = 1}{\y{y}}}{\Let{\y{f}=\Lam{y}{\y{y}};\y{y}=1}{1}}}}
+{\results{\Let{\y{f}=\Lam{y}{\y{y}}}{\y{f}\,1}}{\Let{\y{f}=\Lam{y}{\y{y}};\y{y}=1}{1}}}
+\end{mathpar}
+\end{adjustbox}
+\end{center}
+
+## Natural semantics of lazy evaluation (summary)
+
+\begin{center}
+\begin{adjustbox}{max width=250pt}
+\begin{mathpar}
+\inferrule*[Right=Lam]{{}}
+{\results{\Let{\Gamma}{n}}{\Let{\Gamma}{n}}}
+\\\\
+\inferrule*[Right=Let]{\results{\Let{\Gamma;\Delta}{e}}{\Let{\Theta}{e'}}}
+{\results{\Let{\Gamma}{(\Let{\Delta}{e})}}{\Let{\Theta}{e'}}}
+\\\\
+\inferrule*[Right=Var]{\results{\Let{\Gamma}{e}}{\Let{\Theta}{n}}}
+{\results{\Let{\Gamma;\y{v}=e}{\y{v}}}{\Let{\Theta;\y{v}=n}{n}}}
+\\\\
+\inferrule*[Right=App]{\results{\Let{\Gamma}{e}}{\Let{\Delta}{\Lam{v}{e''}}} \\ \results{\Let{\Delta;\y{v} = e'}{e''}}{\Let{\Theta}{e'''}}}
+{\results{\Let{\Gamma}{e\ e'}}{\Let{\Theta}{e'''}}}
+\end{mathpar}
+\end{adjustbox}
+\end{center}
+
+# Extensions to natural semantics
+
+## Addition & multiplication
+
+\begin{mathpar}
+\inferrule*[Right=Add]{\results{\Let{\Gamma}{e}}{\Let{\Delta}{\ell}} \\ \results{\Let{\Delta}{e'}}{\Let{\Theta}{\ell'}} \\ \ell+\ell'=\ell''}
+{\results{\Let{\Gamma}{e+e'}}{\Let{\Theta}{\ell''}}}
+\end{mathpar}
+
+\begin{mathpar}
+\inferrule*[Right=Mul]{\results{\Let{\Gamma}{e}}{\Let{\Delta}{\ell}} \\ \results{\Let{\Delta}{e'}}{\Let{\Theta}{\ell'}} \\ \ell*\ell'=\ell''}
+{\results{\Let{\Gamma}{e*e'}}{\Let{\Theta}{\ell''}}}
+\end{mathpar}
+
+Example:
+\begin{mathpar}
+\tiny
+\mprset{sep=1.5em}
+\inferrule*{\inferrule*{\inferrule*{\results{\Let{\varepsilon}{1}}{\Let{\varepsilon}{1}} \\ \results{\Let{\varepsilon}{2}}{\Let{\varepsilon}{2}} \\ 1+2=3}{\results{\Let{\varepsilon}{1+2}}{\Let{\varepsilon}{3}}}}{\results{\Let{\y{x}=1+2}{\y{x}}}{\Let{\y{x}=3}{3}}} \\ \inferrule*{\results{\Let{\varepsilon}{3}}{\Let{\varepsilon}{3}}}{\results{\Let{\y{x}=3}{\y{x}}}{\Let{\y{x}=3}{3}}} \\ 3*3=9}
+{\results{\Let{\y{x}=1+2}{\y{x}*\y{x}}}{\Let{\y{x}=3}{9}}}
+\end{mathpar}
+
+
+## Garbage collection
+
+GC removes unused heap bindings:
+
+$$\Let{\y{x}=1}{2}\quad\overset{\text{GC}}{\leadsto}\quad\Let{\varepsilon}{2}$$
+
+GC can be integrated with evaluation:
+
+$$\gcresults{\Let{\y{x}=1+2}{\y{x}*\y{x}}}{\Let{\varepsilon}{9}}$$
+
+Intermediate GCs do not affect the result.
+
+
+## Cycle detection
+
+-------------------------------------- ----- --------------------------------------------- ----------------
+$\E\ni e$                               $=$  $\dots$                                       
+                                        $|$  $\bot$                                        --- error
+----------------------
+
+The $\text{\sc Var}_{\bot}$-rule can handle cyclic evaluations:
+\begin{mathpar}
+\inferrule*[Right=Var$_{\bot}$]{\results{\Let{\Gamma;\y{v}=\bot}{e}}{\Let{\Theta;\y{v}=\bot}{n}}}
+{\results{\Let{\Gamma;\y{v}=e}{\y{v}}}{\Let{\Theta;\y{v}=n}{n}}}
+\end{mathpar}
+$n$ stands for a $\lambda$-abstraction, a literal or an error.
+
+Example:
+\begin{mathpar}
+\inferrule*[Right=Var$_{\bot}$]{\inferrule*[Right=Var$_{\bot}$]{\results{\Let{\y{x}=\bot}{\bot}}{\Let{\y{x}=\bot}{\bot}}}{\results{\Let{\y{x}=\bot}{\y{x}}}{\Let{\y{x}=\bot}{\bot}}}}
+{\results{\Let{\y{x}=\y{x}}{\y{x}}}{\Let{\y{x}=\bot}{\bot}}}
+\end{mathpar}
+
+
+## Open expressions
+
+Open expressions can be handled by adding more rules:
+
+\begin{mathpar}
+\inferrule*[Right=Var-open]{\y{v}\notin\mathrm{dom}\,\Gamma}{\results{\Let{\Gamma}{\y{v}}}{\Let{\Gamma}{\y{v}}}}
+\end{mathpar}
+\begin{mathpar}
+\inferrule*[Right=Var-h]{\results{\Let{\Gamma;\y{v}=\bot}{e}}{\Let{\Theta;\y{v}=\bot}{h}}}
+{\results{\Let{\Gamma;\y{v}=e}{\y{v}}}{\Let{\Theta;\y{v}=h}{\y{v}}}}
+\end{mathpar}
+\begin{mathpar}
+\inferrule*[Right=App-h]{\results{\Let{\Gamma}{e}}{\Let{\Theta}{h}}}
+{\results{\Let{\Gamma}{e\ e'}}{\Let{\Theta}{h\ e'}}}
+\end{mathpar}
+
+$h$ stands for an expression opposite of $n$, i.e. not $\lambda$-abstraction, literal or error.
+
+
+## Remark about work duplication
+
+Only $n$-expressions are copied ever.
+
+\   
+Copying a literal may not duplicate work.
+
+Copying a $\lambda$-abstraction may duplicate work.
+For example, there will be two additions instead of one:
+$$\results{\Let{\y{f}=\Lam{x}{1+2}}{\y{f}\,0*\y{f}\,0}}{9}$$
+Optimal reduction or full laziness optimization can help in this.
+
+
+# Deriving an abstract machine
+
+## Constructing derivation trees
+
+For each expression, a derivation tree for $\Downarrow$ can be made mechanically.
+
+## Steps of construction
+
+\begin{mathpar}\scriptsize
+\inferrule*[Right=Lam]{{}}
+{\results{\underbrace{\Let{\Gamma}{n}}_{\circled{1}}}{\underbrace{\Let{\Gamma}{n}}_{\circled{1}}}}
+\end{mathpar}
+\begin{mathpar}\scriptsize
+\inferrule*[Right=Let]{\results{\overbrace{\Let{\Gamma;\Delta}{e}}^{\circled{2}}}{\overbrace{\Let{\Theta}{e'}}^{\circled{3}}}}
+{\results{\underbrace{\Let{\Gamma}{(\Let{\Delta}{e})}}_{\circled{1}}}{\underbrace{\Let{\Theta}{e'}}_{\circled{3}}}}
+\end{mathpar}
+\begin{mathpar}\scriptsize
+\inferrule*[Right=Var]{\results{\overbrace{\Let{\Gamma}{e}}^{\circled{2}}}{\overbrace{\Let{\Theta}{n}}^{\circled{3}}}}
+{\results{\underbrace{\Let{\Gamma;\y{v}=e}{\y{v}}}_{\circled{1}}}{\underbrace{\Let{\Theta;\y{v}=n}{n}}_{\circled{4}}}}
+\end{mathpar}
+\begin{mathpar}\scriptsize
+\inferrule*[Right=App]{\results{\overbrace{\Let{\Gamma}{e}}^{\circled{2}}}{\overbrace{\Let{\Delta}{\Lam{v}{e''}}}^{\circled{3}}} \\ \results{\overbrace{\Let{\Delta;\y{v} = e'}{e''}}^{\circled{4}}}{\overbrace{\Let{\Theta}{e'''}}^{\circled{5}}}}
+{\results{\underbrace{\Let{\Gamma}{e\ e'}}_{\circled{1}}}{\underbrace{\Let{\Theta}{e'''}}_{\circled{5}}}}
+\end{mathpar}
+
+## Machine state
+
+The current expression is not enough to continue the construction.
+
+The missing information in the rules:
+
+\begin{mathpar}\scriptsize
+\inferrule*[Right=Var]{\results{\overbrace{\Let{\Gamma}{e}}^{\circled{2}\ \y{v}=\bullet}}{\overbrace{\Let{\Theta}{n}}^{\circled{3}\ \y{v}=\bullet}}}
+{\results{\underbrace{\Let{\Gamma;\y{v}=e}{\y{v}}}_{\circled{1}}}{\underbrace{\Let{\Theta;\y{v}=n}{n}}_{\circled{4}}}}
+\end{mathpar}
+\begin{mathpar}\scriptsize
+\inferrule*[Right=App]{\results{\overbrace{\Let{\Gamma}{e}}^{\circled{2}\ \bullet\,e'}}{\overbrace{\Let{\Delta}{\Lam{v}{e''}}}^{\circled{3}\ \bullet\,e'}} \\ \results{\overbrace{\Let{\Delta;\y{v} = e'}{e''}}^{\circled{4}}}{\overbrace{\Let{\Theta}{e'''}}^{\circled{5}}}}
+{\results{\underbrace{\Let{\Gamma}{e\ e'}}_{\circled{1}}}{\underbrace{\Let{\Theta}{e'''}}_{\circled{5}}}}
+\end{mathpar}
+
+We need a stack to store the missing information!
+
+
+## Expressions with stack
+
+$$e; S$$
+\begin{mathpar}\scriptsize
+\inferrule*[Right=Lam]{{}}
+{\results{\Let{\Gamma}{n}; S}{\Let{\Gamma}{n}; S}}
+\end{mathpar}
+\begin{mathpar}\scriptsize
+\inferrule*[Right=Let]{\results{\Let{(\Gamma;\Delta)}{e}; S}{\Let{\Theta}{e'}; S}}
+{\results{\Let{\Gamma}{(\Let{\Delta}{e})}; S}{\Let{\Theta}{e'}; S}}
+\end{mathpar}
+\begin{mathpar}\scriptsize
+\inferrule*[Right=Var]{\results{\Let{\Gamma}{e}; \y{v}=\bullet,S}{\Let{\Theta}{n}; \y{v}=\bullet,S}}
+{\results{\Let{(\Gamma;\y{v}=e)}{\y{v}}; S}{\Let{(\Theta;\y{v}=n)}{n}; S}}
+\end{mathpar}
+\begin{mathpar}\scriptsize\mprset{sep=1.5em}
+\inferrule*[Right=App]{\results{\Let{\Gamma}{e}; \bullet\,e',S}{\Let{\Delta}{\Lam{v}{e''}}; \bullet\,e',S} \\ \results{\Let{\Delta;\y{v} = e'}{e''}; S}{\Let{\Theta}{e'''}; S}}
+{\results{\Let{\Gamma}{e\ e'}; S}{\Let{\Theta}{e'''}; S}}
+\end{mathpar}
+
+## The abstract machine
+
+Machine state
+
+$$\Let{\underbrace{\Gamma}_{\text{heap}}}{\underbrace{e}_{\text{target expression}}}; \underbrace{S}_{\text{stack}}$$
+
+Machine rules
+
+----------------------------------------------- ----------------------------------------------- ---------
+$\Let{\Gamma}{(\Let{\Delta}{e})};\ S$           $\leadsto \Let{(\Gamma;\Delta)}{e};\ S$         \sc Let
+$\Let{(\Gamma;\y{v}=e)}{\y{v}};\ S$             $\leadsto \Let{\Gamma}{e};\ \y{v}=\bullet,S$    $\text{\sc Var}_1$
+$\Let{\Gamma}{n};\ \y{v}=\bullet,S$             $\leadsto \Let{(\Gamma;\y{v}=n)}{n};\ S$        $\text{\sc Var}_2$
+$\Let{\Gamma}{e\ e'};\ S$                       $\leadsto \Let{\Gamma}{e};\ \bullet\,e',S$      $\text{\sc App}_1$
+$\Let{\Gamma}{\Lam{v}{e''}};\ \bullet\,e',S$    $\leadsto \Let{(\Gamma;\y{v} = e')}{e''};\ S$   $\text{\sc App}_2$
+--------------------------------
+
+## Machine rules handling addition
+
+--------------------------------------------------------------- ----------------------------------------------- -----------------------
+$\Let{\Gamma}{e+e'};\ S$                                        $\leadsto \Let{\Gamma}{e};\ \bullet+e',S$       $\text{\sc Add}_1$
+$\Let{\Gamma}{\ell};\ \bullet+e, S$                             $\leadsto \Let{\Gamma}{e};\ \ell+\bullet,S$     $\text{\sc Add}_2$
+$\Let{\Gamma}{\ell'};\ \ell+\bullet, S\quad\ell+\ell'=\ell''$   $\leadsto \Let{\Gamma}{\ell''};\ S$             $\text{\sc Add}_3$
+--------------------------------
+
+
+Example:
+
+------------------------------------------------------------------- ------- -------------------------------
+$\Let{\y{x}=1+2}{\y{x}*\y{x}};\quad\varepsilon$                             $\oleadsto{\text{\sc Mul}_1}$
+$\Let{\y{x}=1+2}{\y{x}};\quad\bullet*\y{x}$                                 $\oleadsto{\text{\sc Var}_1}$
+$\Let{\varepsilon}{1+2};\quad\y{x}=\bullet,\bullet*\y{x}$                   $\oleadsto{\text{\sc Add}_1}$
+$\Let{\varepsilon}{1};\quad\bullet+2,\y{x}=\bullet,\bullet*\y{x}$           $\oleadsto{\text{\sc Add}_2}$
+$\Let{\varepsilon}{2};\quad 1+\bullet,\y{x}=\bullet,\bullet*\y{x}$  1+2=3   $\oleadsto{\text{\sc Add}_3}$
+$\Let{\varepsilon}{3};\quad\y{x}=\bullet,\bullet*\y{x}$                     $\oleadsto{\text{\sc Var}_2}$
+$\Let{\y{x}=3}{3};\quad\bullet*\y{x}$                                       $\oleadsto{\text{\sc Mul}_2}$
+$\Let{\y{x}=3}{\y{x}};\quad 3*\bullet$                                      $\oleadsto{\text{\sc Var}_1}$
+$\Let{\varepsilon}{3};\quad\y{x}=\bullet,\bullet*\y{x}$                     $\oleadsto{\text{\sc Var}_2}$
+$\Let{\y{x}=3}{3};\quad 3*\bullet$                                  3*3=9   $\oleadsto{\text{\sc Mul}_3}$
+$\Let{\y{x}=3}{9};\quad\varepsilon$                                 
+--------------
+
+## Reference
+
+Peter Sestoft: *Deriving a Lazy Abstract Machine*  
+Journal of Functional Programming, 1997.
+
+# STG
+
+## STG overview
+
+The Spineless Taggless G-machine is an abstract machine for lazy evaluation.
+
+\   
+GHC compiler's code generation is based on STG.
+
+\   
+Simon Peyton Jones: *Implementing Lazy Functional Languages on Stock Hardware: The Spineless Tagless G-machine*  
+Journal of Functional Programming, 1992.
+
+
+
+## STG vs. the previous machine
+
+STG has the following differences:
+
+-   update flag
+-   application on atoms only
+-   multi-arg application and $\lambda$-abstraction
+-   top-level $\lambda$-abstractions only
+
+## Update flag (optimization idea)
+
+We infer by static analysis when no update on the heap is needed after evaluating a heap-expression.
+
+\   
+$\text{\sc Var}$-rule splits into two:
+\begin{mathpar}
+\inferrule*[Right=Var-update]{\results{\Let{\Gamma}{e}}{\Let{\Theta}{n}}}
+{\results{\Let{\Gamma;\y{v}_{\text{u}}=e}{\y{v}}}{\Let{\Theta;\y{v}=n}{n}}}
+\end{mathpar}
+\begin{mathpar}
+\inferrule*[Right=Var-no-update]{\results{\Let{\Gamma}{e}}{\Let{\Theta}{n}}}
+{\results{\Let{\Gamma;\y{v}_{\text{nu}}=e}{\y{v}}}{\Let{\Theta}{n}}}
+\end{mathpar}
+
+
+## Application on atoms only
+
+-------------------------------------- ----- --------------------------------------------- ----------------
+$\E\ni e$                               $=$  $\dots$
+                                        $|$  $e\ a$                                        --- application $\medskip$
+$\mathcal{A}\ni a$                      $=$  $\y{v}$                                       --- variable
+                                        $|$  $\ell$                                        --- literal
+----------------------
+
+Different $\text{\sc App}$-rule:
+\begin{mathpar}
+\inferrule*[Right=App']{\results{\Let{\Gamma}{e}}{\Let{\Delta}{\Lam{v}{e'}}} \\ \results{\Let{\Delta}{e'[\y{v}\mapsto a]}}{\Let{\Theta}{e''}}}
+{\results{\Let{\Gamma}{e\ a}}{\Let{\Theta}{e''}}}
+\end{mathpar}
+
+-   $e'[\y{v}\mapsto a]$ is implemented by *closures* to avoid substitution
+
+## Multi-arg application and $\lambda$-abstraction
+
+-------------------------------------- ----- --------------------------------------------- ----------------
+$\E\ni e$                               $=$  $\dots$
+                                        $|$  $\y{v}\ a_1\cdots a_n$                        --- application
+                                        $|$  $\Lam{v_1\cdots v_n}{e}$                      --- $\lambda$-abstraction
+----------------------
+
+More efficient, but needs more care (push/enter or eval/apply)
+
+
+## Top-level $\lambda$-abstractions only
+
+$\lambda$-abstractions can not be inside STG expressions for efficiency and simplicity.
+
+\   
+This is achieved by the $\lambda$-lifting transformation.
+
+
+## Missing from this presentation
+
+Practical extensions to $\lambda$-calculus:
+
+-   more literals
+-   more builtin functions
+    -   foreign function interface
+-   constructors
+    -   algebraic data types
+-   case expression
+    -   pattern matching
+-   type annotation
+    -   typing
+
+
+
+
+## Questions
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

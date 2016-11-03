@@ -1,0 +1,21 @@
+\usepackage{graphicx}
+\usepackage{mathtools}
+\usepackage{mathpartir}
+\usepackage{stmaryrd}
+\usepackage{color}
+\usepackage{adjustbox}
+\usepackage{tikz}
+
+\newcommand*\circled[1]{\tikz[baseline=(char.base)]{
+    \node[shape=circle,draw,inner sep=1pt] (char) {\tiny #1};}}
+
+\newcommand{\y}[1]{{\color{red}#1}}
+
+\newcommand{\oleadsto}[1]{#1\leadsto}
+\newcommand{\results}[2]{{#1}\ \Downarrow\ {#2}}
+\newcommand{\gcresults}[2]{{#1}\ \Downarrow_{\text{\tiny GC}}\ {#2}}
+\newcommand{\E}{\mathcal{E}}
+\newcommand{\arr}{\rightarrow}
+\newcommand{\Let}[2]{\text{let}\,#1\,\text{in}\,#2}
+\newcommand{\Lam}[2]{\lambda \y{#1}\mapsto#2}
+
