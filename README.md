@@ -15,6 +15,11 @@ For more info visit the [group's site.][meetup]
 * [Repo for the presentations][2016-05-23]
 * [Meetup site][quake3]
 
+### :zzz: Lazy evaluation (2016-11-03)
+
+* [Presentation slides](https://github.com/BP-HUG/presentations/blob/master/2016_november/lazy_evaluation.pdf)
+* [Meetup site][lazy]
+
 ## For future events
 If you want to hold a presentation create an issue here, or contact us on the [meetup's site][meetup].
 For help check out our wiki for a [checklist][wiki] for helping getting you ready.
@@ -25,3 +30,4 @@ For help check out our wiki for a [checklist][wiki] for helping getting you read
 [2016-05-23]: https://github.com/BP-HUG/presentations/blob/master/2016_may/2016-05-23_Parsing_Quake3_game_content.md
 [quake3]: http://www.meetup.com/Bp-HUG/events/231077698/
 [wiki]: https://github.com/BP-HUG/presentations/wiki
+[lazy]: http://www.meetup.com/Bp-HUG/events/234826537/
