@@ -27,11 +27,8 @@ For more info visit the [group's site.][meetup]
 * [Meetup site][essence]
 
 #### Additional resources:
-<<<<<<< HEAD
+
 * The original paper: [Philip Wadler - The Essence of Functional Programming][wadler_essence]
-=======
-* The Original paper: [Philip Wadler - The Essence of Functional Programming][wadler_essence]
->>>>>>> 5811ded41fff142c268c714235f7e1d401c33bfb
 * [Channel 9 presentation based on the original paper][c9_essence]
 * [A good intro to monads][monad_intro]
 
