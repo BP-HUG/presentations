@@ -32,6 +32,12 @@ For more info visit the [group's site.][meetup]
 * [Channel 9 presentation based on the original paper][c9_essence]
 * [A good intro to monads][monad_intro]
 
+### :dollar: Digital Asset: Smart Contract and FP (2017-06-27)
+
+* [Presentation repo](https://github.com/DACH-NY/budapest-fp-meetup/)
+* [Meetup site][digital_asset]
+
+
 ## For future events
 If you want to hold a presentation create an issue here, or contact us on the [meetup's site][meetup].
 For help check out our wiki for a [checklist][wiki] for helping getting you ready.
@@ -48,3 +54,4 @@ For help check out our wiki for a [checklist][wiki] for helping getting you read
 [c9_essence]: https://channel9.msdn.com/Shows/Going+Deep/C9-Lectures-Dr-Ralf-Lmmel-AFP-The-Quick-Essence-of-Functional-Programming
 [wadler_essence]: http://homepages.inf.ed.ac.uk/wadler/topics/monads.html
 [monad_intro]: http://adit.io/posts/2013-04-17-functors,_applicatives,_and_monads_in_pictures.html
+[digital_asset]: https://www.meetup.com/Bp-HUG/events/240585887/
